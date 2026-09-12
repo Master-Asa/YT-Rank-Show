@@ -1,0 +1,5 @@
+'use strict';
+const params=new URLSearchParams(location.search),kind=document.body.dataset.kind,top=String(Math.max(1,Math.min(10,Number(params.get('top'))||10))),output=document.getElementById('output'),frame=document.getElementById('source');
+output.textContent='正在連接わんコメ…';
+frame.addEventListener('load',()=>{try{const doc=frame.contentDocument,kindSelect=doc.getElementById('kind'),topSelect=doc.getElementById('top'),periodSelect=doc.getElementById('period'),preview=doc.getElementById('preview');if(!kindSelect||!topSelect||!periodSelect||!preview)throw new Error('管理頁尚未完成載入');kindSelect.value=kind;topSelect.value=top;periodSelect.value='current';for(const element of [kindSelect,topSelect,periodSelect])element.dispatchEvent(new Event('change',{bubbles:true}));const sync=()=>{const value=preview.textContent.trim();output.textContent=value||`【本場 ${kind==='sc'?'SC':'贈送會員'} 排行榜】`};sync();new MutationObserver(sync).observe(preview,{subtree:true,childList:true,characterData:true})}catch(error){output.textContent='OBS 輸出初始化失敗：'+error.message}});
+frame.src='index.html';

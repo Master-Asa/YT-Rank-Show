@@ -1,0 +1,32 @@
+name: Verify clean Windows release
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify and package (three successful test rounds required)
+        run: node scripts/package.js
+      - name: Retain clean packages for review (not a public release)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-windows-package
+          path: |
+            dist/release-*/*.zip
+            dist/release-*/SHA256SUMS.txt
+            dist/release-*/VALIDATION.json
+          if-no-files-found: error
+          retention-days: 14

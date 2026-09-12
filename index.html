@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>YT Rank Show</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:11181 http://localhost:11180 http://127.0.0.1:11180 ws://localhost:11180 ws://127.0.0.1:11180; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <script src="management-theme.js"></script>
+  <link rel="stylesheet" href="disclosure.css">
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="workspace.css">
+  <link rel="stylesheet" href="creator.css">
+  <link rel="stylesheet" href="management-theme.css">
+  <link rel="stylesheet" href="interface-sections.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">▂▅▇</span><div><h1>YT <strong>Rank</strong> Show</h1><div class="brand-meta">ONECOMME SUPPORT TRACKER <span class="brand-version">v0.9.0</span></div></div></div>
+      <div id="status" class="connection-pill"><i></i><span>正在連接わんコメ…</span></div>
+    </header>
+    <nav class="nav nav-pills app-nav" aria-label="主要功能">
+      <button class="nav-link active" data-tab="overview">即時總覽</button>
+      <button class="nav-link" data-tab="events">事件紀錄</button>
+      <button class="nav-link" data-tab="records">頻道與直播</button>
+      <button class="nav-link" data-tab="exports">匯出與備份</button>
+      <button class="nav-link" data-tab="ranking">排行榜</button>
+      <button class="nav-link" data-tab="settings">OBS 輸出</button>
+      <button class="nav-link" data-tab="appearance">外觀與幣別</button>
+    </nav>
+    <main>
+      <div id="channelLockStatus" class="alert alert-info" role="status"></div>
+      <div id="backgroundNotice" role="status">正在確認背景收錄狀態；舊資料仍保留在本機。</div>
+      <div id="storageWarning" class="alert alert-danger" role="alert" hidden></div>
+      <section id="overview" class="panel"></section>
+      <section id="events" class="panel" hidden>
+        <button id="repairMembership" type="button" class="btn btn-outline-primary mb-3">重新解析贈送會員紀錄</button>
+        <p id="membershipRepairNotice" role="status"></p>
+        <div class="panel-heading"><div><h2>事件紀錄</h2><p>SC、會員與寶石紀錄。表格可左右捲動；留言只顯示文字，狀態欄保留完整原因。</p></div></div>
+        <div class="table-responsive event-table-scroll" tabindex="0" aria-label="事件紀錄，可左右捲動"><table class="table align-middle event-table"><thead><tr><th>時間</th><th>場次</th><th>使用者</th><th>類型</th><th>原始金額</th><th>換算台幣</th><th>贈送會員</th><th>寶石</th><th>留言</th><th>狀態</th></tr></thead><tbody id="eventRows"></tbody></table></div>
+      </section>
+      <section id="records" class="panel" hidden>
+        <div class="panel-heading"><div><h2>頻道與直播管理</h2><p>只匯出這個管理頁已保存的紀錄，不會補抓 OneComme 全部歷史。</p></div></div>
+        <p id="recordHealth" class="small text-secondary"></p>
+        <div class="border rounded p-3 mb-4">
+          <h3 class="h5">1. 選擇要統計的實況主</h3>
+          <p class="small text-secondary">設定會自動保留。</p>
+          <details id="channelSetup" open><summary>設定或更換實況主</summary>
+          <p class="creator-help">貼上頻道網址。@名稱請先查詢；UC 開頭的 Channel ID 可直接離線儲存。</p>
+          <label class="field"><span>實況主名稱（方便辨識，可自行命名）</span><input id="channelNameInput" class="form-control" maxlength="100" placeholder="例如：我的直播頻道"></label>
+          <label class="field"><span>直播主 Channel ID／頻道網址</span><input id="channelIdInput" class="form-control" placeholder="https://www.youtube.com/@頻道名稱 或 UC…" aria-describedby="channelSetupNotice channelLookupPrivacy" autocomplete="off"></label>
+          <p id="channelLookupPrivacy" class="small">查詢時才連線至 YouTube，傳送公開頻道網址與連線 IP；不傳送紀錄、設定或 OBS 金鑰。</p>
+          <label class="creator-check"><input id="channelLookupConsent" type="checkbox">同意本次設定期間向 YouTube 查詢公開頻道資料</label>
+          <button id="queryChannel" type="button" class="btn btn-outline-primary my-2">查詢頻道（連線 YouTube）</button>
+          <div id="channelLookupResult" class="border rounded p-3 my-2" hidden><strong id="channelLookupName"></strong><p id="channelLookupId" class="small"></p><button id="useChannelLookup" type="button" class="btn btn-success">確認並儲存此頻道</button></div>
+          <button id="saveChannelLock" type="button" class="btn btn-primary my-2">儲存／更換鎖定頻道</button>
+          <p id="channelSetupNotice" class="small" role="status" aria-live="polite"></p>
+          <div hidden aria-hidden="true"><input id="publicChannelInput"><button id="resolvePublicChannel" type="button" disabled>線上解析已移除</button></div>
+          </details><section class="border rounded p-3 my-3"><h3 class="h5">新直播確認小視窗</h3><label class="creator-check"><input id="nativePromptEnabled" type="checkbox">連接尚未確認的新直播時，顯示獨立確認小視窗</label><p class="small text-secondary">不必開管理頁。稍後／關閉：本次執行不再提醒，可在此手動確認；重新啟動後會再提示。小視窗可能被 OBS 螢幕擷取拍到。</p><p id="nativePromptNotice" class="small" role="status"></p></section><section class="border rounded p-3 my-3"><h3 class="h5">自動跟隨這個頻道的新直播</h3><p>將下方固定頻道網址貼到 OneComme 的連線網址。收到該頻道目前的直播資訊後，會自動加入統計，不必每場開啟管理頁。</p><div class="d-flex gap-2"><input id="autoChannelUrl" class="form-control" aria-label="OneComme 固定頻道連線網址" readonly><button id="copyAutoChannelUrl" type="button" class="btn btn-outline-primary">複製</button></div><p id="autoChannelNotice" class="small mt-2" role="status"></p><p class="small text-secondary">直接貼影片網址或 @handle 而無法核對歸屬時，仍需下方人工確認；不會把其他頻道自動算入。</p></section><h3 class="h5 mt-4">手動加入單一直播</h3><p>加入前請核對實況主；此操作為人工確認，不會線上驗證。</p>
+          <label class="field"><span>選擇已收到的直播（也可直接貼網址）</span><select id="channelLiveChoice" class="form-select"></select></label>
+          <label class="field"><span>這次直播的網址</span><input id="channelLiveInput" class="form-control" placeholder="YouTube 直播網址或 11 碼影片 ID" autocomplete="off"></label>
+          <button id="resolveLiveOwner" type="button" hidden disabled>線上解析已移除</button>
+          <p id="publicResolveNotice" class="small" role="status"></p>
+          <div id="publicResolveResult" class="border rounded p-3 my-2" hidden>
+            <h4 id="publicChannelName" class="h5"></h4>
+            <p id="publicChannelId" class="small text-secondary"></p>
+            <p id="publicVideoTitle" class="small"></p>
+            <span id="publicChannelLink"></span>
+            <button id="confirmPublicChannel" type="button" class="btn btn-success d-block mt-2" disabled>確認並鎖定這個頻道</button>
+          </div>
+
+          <button id="confirmChannelLive" type="button" class="btn btn-primary my-2">核對後加入這場直播</button>
+          <p id="channelNotice" class="small" role="status"></p>
+          <p id="channelUrlWarning" class="small text-warning"></p>
+          <section id="sessionManager" aria-label="直播場次管理"></section>
+        </div>
+      </section>
+      <section id="exports" class="panel" hidden>
+        <div class="panel-heading"><div><h2>匯出與備份</h2><p>下載指定月份、單場或全部已收錄紀錄。</p></div></div>
+        
+        <div class="form-grid">
+          <label class="field"><span>要下載哪段時間？</span><select id="exportScope" class="form-select"><option value="month">按月份</option><option value="session">單場直播</option><option value="all">全部歷史</option></select></label>
+          <label id="exportSessionField" class="field" hidden><span>選擇直播</span><select id="exportSession" class="form-select"></select></label>
+          <label id="exportMonthField" class="field"><span>選擇年份與月份</span><input id="exportMonth" type="month" class="form-control"></label>
+          <label class="field"><span>要下載什麼？</span><select id="exportContent" class="form-select"><option value="detail">每筆支持明細</option><option value="sc">SC 排行榜</option><option value="gift">贈送會員排行榜</option><option value="jewel">寶石排行榜</option><option value="summary">各場總計（含寶石）</option></select></label>
+        </div>
+        <p id="exportSelectionHint" role="status"></p><button id="downloadCsv" type="button" class="btn btn-primary">下載 CSV（Excel 可開啟）</button>
+        <div hidden><button type="button" data-export="detail">事件明細 CSV</button><button type="button" data-export="sc">SC 排行 CSV</button><button type="button" data-export="gift">贈送會員排行 CSV</button><button type="button" data-export="jewel">寶石排行 CSV</button><button type="button" data-export="summary">各場彙總 CSV</button></div>
+        <details class="advanced-block"><summary>統計期間與匯出範圍</summary><p>每月從台北時間 1 日 00:00 算到次月 1 日前。只匯出已收錄紀錄，不補抓直播歷史；直播結束不會刪除月榜或歷史。</p></details>
+        <details class="advanced-block"><summary>測試、備份與資料保存說明</summary>
+          <label class="field"><span>之後收到的事件用途</span><select id="recordMode" class="form-select"><option value="production">正式紀錄（符合條件才計入）</option><option value="test">測試紀錄（保存但不計正式統計）</option></select></label>
+          <label class="form-check my-3"><input id="exportIncludeAll" type="checkbox" class="form-check-input"><span class="form-check-label">明細 CSV 也列出未計入的紀錄與原因（不影響排行榜）</span></label>
+          <button type="button" class="btn btn-outline-secondary" data-export="backup">下載完整 JSON 備份</button>
+          <p>備份含全部紀錄與設定，不受月份限制；目前尚無一鍵還原。</p>
+          <p>背景插件啟用後，OBS 直接讀取背景計算的排行，不需要保持管理頁開啟。未啟用背景的舊模板模式仍需管理頁與同步器開啟。未標記的模擬事件無法可靠自動識別，測試前請切換為測試紀錄。</p>
+        </details>
+        <p id="exportNotice" role="status" class="small"></p>
+      </section>
+      <section id="ranking" class="panel" hidden>
+        <div class="panel-heading"><div><h2>排行榜預覽</h2><p>本場只看目前連線；本月與歷史保留符合條件的支持紀錄。</p></div><div class="ranking-controls"><select id="period" class="form-select"><option value="current">本場</option><option value="today">今日</option><option value="monthly">本月</option><option value="all_time">歷史全部</option></select><select id="kind" class="form-select"><option value="sc">SC 金額</option><option value="gift">贈送會員</option><option value="jewel">寶石</option></select><select id="top" class="form-select"><option>3</option><option>5</option><option>10</option></select></div></div>
+        <div id="rankingExplanation" class="empty-explanation" role="status" hidden></div><button id="rankingHelp" type="button" class="btn btn-outline-primary mb-3" hidden>前往頻道設定／加入直播</button>
+        <pre id="preview" class="ranking-preview"></pre>
+      </section>
+      <section id="settings" class="settings-layout" hidden>
+        <details id="appearancePanel" class="panel settings-panel" open><summary>調整排行外觀與幣別</summary>
+          <div class="panel-heading"><div><h2>顯示與幣別</h2><p>所有設定只保存在本機</p></div></div>
+          <form id="settingsForm"><details class="advanced-block" open><summary>文字間距、名稱長度與幣別</summary>
+            <div class="form-grid">
+              <label class="field"><span>單獨 $ 代表的幣別</span><select name="dollarCurrency" class="form-select"><option>TWD</option><option>USD</option></select></label>
+              <label class="field"><span>匯率更新日期</span><input name="ratesUpdatedAt" class="form-control" type="date"></label>
+              <label class="field"><span>名次與姓名空格</span><input type="number" class="form-control" name="rankNameSpaces" min="0" max="20"></label>
+              <label class="field"><span>姓名與數值空格</span><input type="number" class="form-control" name="nameValueSpaces" min="0" max="20"></label>
+              <label class="field"><span>每名空白行</span><input type="number" class="form-control" name="blankLines" min="0" max="2"></label>
+              <label class="field"><span>名稱最大長度</span><input type="number" class="form-control" name="maxNameLength" min="1" max="100"></label>
+            </div>
+            <label class="form-check setting-switch"><input class="form-check-input" type="checkbox" name="showTitle"><span class="form-check-label">顯示排行榜標題</span></label>
+            </details><details class="advanced-block"><summary>手動匯率（只影響 SC 換算）</summary><fieldset class="rates-card"><legend>人工匯率 <span>兌 TWD</span></legend><div id="rates" class="rate-grid"></div></fieldset></details>
+            <details id="privacyInfo" class="advanced-block"><summary>隱私與背景收錄說明</summary><p>插件不含遙測、雲端備份或線上 YouTube 解析。紀錄、背景圖與字型只保存在本機；OBS 從本機讀取。OneComme 本身仍會連線直播平台。</p><p>背景資料位於 Windows 的 %APPDATA%\YT-Rank-Show\data，與更新的程式檔分開。JSON 備份含全部原始紀錄，請勿隨意分享。OBS 網址也請保密。</p><p>背景啟用後可關閉管理頁；關閉 OneComme 或停用插件就停止收錄。未啟用背景的過渡模板模式仍需管理頁保持開啟。沒有任何軟體能保證已受感染的電腦或其他插件不會讀取本機資料。</p></details>
+            <p id="outputPath" class="path-note"></p>
+            <div class="action-row"><button class="btn btn-primary" type="submit">儲存設定</button><button class="btn btn-outline-secondary" type="button" id="rebuild">重新計算排行</button></div>
+          </form>
+        </details>
+        <aside class="panel obs-panel">
+          <div class="panel-heading"><div><h2>OBS 同步輸出</h2><p>讀取本機背景的計算結果，SC／會員／寶石可同時使用。</p></div><button id="publishObs" type="button" class="btn btn-outline-primary">立即同步</button></div>
+          <p id="obsSyncStatus" role="status">正在準備同步…</p><div id="obsBoards"></div>
+          <div class="obs-steps"><strong>加入 OBS</strong><ol><li>來源按「＋」選擇「瀏覽器」</li><li>每種輸出各建一個來源，貼上對應 URL</li><li>排行榜寬度建議 700、高度 500；寶石只有純數字，可自行縮小</li></ol></div>
+          <div class="mt-4 border-top pt-3">
+            <h3 class="h6">統計管理</h3>
+            <p class="small text-secondary">清空本場、今日、本月與歷史統計；保留原始事件、排版及匯率。新版 OBS 同步來源也會更新。</p>
+            <button id="resetStatistics" type="button" class="btn btn-outline-danger">清空統計紀錄</button>
+            <p id="resetNotice" class="small mt-2" role="status"></p>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="app-toast" role="status"></div>
+  <script src="local-client.js"></script>
+  <script src="channel-lock.js"></script>
+  <script src="public-resolver.js"></script>
+  <script src="record-policy.js"></script>
+  <script src="rank-output.js"></script>
+  <script src="admin.js"></script>
+  <script src="record-export.js"></script>
+  <script src="channel-admin.js"></script>
+  <script src="channel-resolver-ui.js"></script>
+  <script src="ui-guidance.js"></script>
+  <script src="membership-repair-ui.js"></script>
+  <script src="app-version.js"></script>
+  <script src="workspace-ui.js"></script>
+  <script src="style-theme.js"></script>
+  <script src="style-store.js"></script>
+  <script src="obs-renderer.js"></script>
+  <script src="font-face-cache.js"></script>
+<script src="font-picker.js"></script>
+  <script src="studio-template.js"></script>
+<script src="studio-canvas.js"></script>
+<script src="studio-emoji.js"></script>
+<script src="studio-font-preview.js"></script>
+<script src="creator-ui.js"></script>
+  <script src="obs-publisher.js"></script>
+  <script src="storage-ui.js"></script>
+  <script src="history-ui.js"></script>
+  <script src="session-manager.js"></script>
+  <script src="interface-sections.js"></script>
+  <script src="update-ui.js"></script>
+</body>
+</html>

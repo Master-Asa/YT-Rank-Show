@@ -1,0 +1,29 @@
+/* Visible grouping in both themes; do not hide runtime errors or permissions. */
+.app-shell #records .ui-region,.app-shell #exports .ui-region,.app-shell #appearance .ui-region{min-width:0;border:1px solid #d2d9e5!important;border-radius:14px!important;background:#f9fafc;padding:20px!important;margin:0 0 18px!important;box-shadow:0 2px 5px #1c294006}
+.app-shell .ui-region>.region-heading,.app-shell .ui-region>h3{margin:0 0 16px!important;font-size:1.05rem!important;font-weight:700}
+.channel-region-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;margin:16px 0}
+.app-shell #records .channel-region-grid>.ui-region{margin:0!important}
+#channelRegion,.manual-region{grid-column:1/-1}
+#channelRegion #channelSetup{padding:0;background:transparent;border:0;margin:0;max-width:none}
+#channelRegion #channelSetup>summary{margin:0}
+#channelRegion #channelSetup[open]>summary{margin-bottom:16px}
+.app-shell .ui-region details.section-help>summary{display:flex;min-height:0!important;padding:6px 0!important;margin:8px 0 0!important;border:0!important;border-radius:0!important;background:transparent!important;color:#635392;font-size:.82rem;font-weight:500;justify-content:flex-start;gap:12px}
+.app-shell .ui-region details.section-help>summary::after{font-size:.85em}
+.section-help p{font-size:.85rem;line-height:1.65;color:var(--muted);margin:.65em 0}
+.region-hint,.region-caution{font-size:.85rem;line-height:1.6;margin:8px 0 12px;color:var(--muted)}
+.region-caution{border-left:3px solid #b09a66;padding-left:10px}
+#autoChannelRegion .d-flex{flex-wrap:wrap}
+#autoChannelRegion .d-flex input{flex:1 1 220px;min-width:0;font-size:.8rem}
+#copyAutoChannelUrl{white-space:nowrap}
+#nativePromptNotice:empty,#channelNotice:empty,#channelSetupNotice:empty,#autoChannelNotice:empty{display:none}
+.app-shell .manual-region>summary{margin:0!important;background:transparent!important;border:0!important;padding:0!important;min-height:1.6em!important;color:inherit;font-weight:700}
+#recordHealth{font-size:.85rem;color:var(--muted)}
+#backgroundNotice[data-state=ready]{font-size:.85rem;padding:8px 12px;margin-bottom:14px}
+#exports>.advanced-block{margin-top:18px!important}
+html[data-ui-theme=dark] .app-shell :is(#records,#exports,#appearance) .ui-region{background:#1b222e;border-color:#46536a!important;box-shadow:none}
+html[data-ui-theme=dark] #recordHealth{color:var(--muted)!important}
+html[data-ui-theme=dark] #channelRegion #channelSetup{background:transparent;border:0}
+html[data-ui-theme=dark] .app-shell .ui-region details.section-help>summary{background:transparent;color:#c5b5ff;border:0}
+html[data-ui-theme=dark] .app-shell .manual-region>summary{background:transparent;color:var(--ink);border:0}
+@media(max-width:1100px){.channel-region-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:550px){.app-shell .ui-region{padding:14px!important}.channel-region-grid{gap:14px}}

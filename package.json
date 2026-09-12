@@ -1,0 +1,15 @@
+{
+  "name": "yt-rank-show",
+  "version": "0.9.0",
+  "private": true,
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check plugin.js && node --check src/core.js && node --check src/runtime.js && node --check admin.js && node --check record-policy.js && node --check record-export.js && node --check channel-lock.js && node --check channel-admin.js && node --check public-resolver.js && node --check channel-resolver-ui.js && node --check src/youtube-resolver.js && node --check scripts/resolver-server.js",
+    "package": "node scripts/package.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

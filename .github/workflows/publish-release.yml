@@ -1,0 +1,126 @@
+name: Publish release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version in VERSION, for example 0.8.7 (without v)'
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-release.yml]
+permissions:
+  contents: read
+concurrency:
+  group: private-test-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    # One-time authorized bootstrap; later releases use Run workflow on main.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.head_commit.message == 'Publish release v0.8.7')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Validate requested version
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          $requested = if ($env:GITHUB_EVENT_NAME -eq 'push') { '0.8.7' } else { $env:REQUESTED_VERSION }
+          if ($version -ne $requested) { throw 'Requested version does not match checkout' }
+          $tag = 'v' + $version
+          $existing = git tag --list $tag
+          if ($LASTEXITCODE -ne 0 -or $existing) { throw 'Tag already exists; review instead of overwriting' }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Verify and package (three successful test rounds required)
+        run: node scripts/package.js
+      - name: Upload draft, verify assets, then publish pre-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_VERSION
+          $tag = 'v' + $version
+          $private = gh api "repos/$env:GH_REPO" --jq '.private'
+          if ($LASTEXITCODE -ne 0 -or $private -ne 'true') { throw 'This workflow only publishes in a private repository' }
+          $dirs = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object Name -Like "release-$version-*")
+          if ($dirs.Count -ne 1) { throw 'Expected exactly one validated package directory' }
+          $folder = $dirs[0].FullName
+          $names = @("YT-Rank-Show-$version-Windows.zip", "YT-Rank-Show-$version-Source.zip", 'SHA256SUMS.txt', 'VALIDATION.json')
+          $files = @($names | ForEach-Object { Join-Path $folder $_ })
+          foreach ($file in $files) { if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw 'Missing release asset' } }
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          $changes = Get-Content -LiteralPath CHANGELOG.md -Raw
+          $section = [regex]::Match($changes, '(?ms)^# v' + [regex]::Escape($version) + '\r?\n.*?(?=^# v|\z)')
+          if (!$section.Success) { throw 'Missing changelog section for release' }
+          $section.Value.Trim() | Set-Content -LiteralPath $notes -Encoding utf8
+          # Drafts have no published tag endpoint. Resolve their stable release ID.
+          $raw = gh api "repos/$env:GH_REPO/releases" --paginate --slurp
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing releases' }
+          $existing = @($raw | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object tag_name -EQ $tag)
+          if ($existing.Count -gt 1) { throw 'Ambiguous release; review manually' }
+          if ($existing.Count -eq 1) {
+            if (!$existing[0].draft -or !$existing[0].prerelease) { throw 'Never overwrite an already published release' }
+            $id = $existing[0].id
+            $existingNames = @($existing[0].assets | ForEach-Object name)
+            if (@($existingNames | Where-Object { $_ -notin $names }).Count) { throw 'Unexpected draft assets; review manually' }
+            gh api --method PATCH "repos/$env:GH_REPO/releases/$id" -f "target_commitish=$env:GITHUB_SHA" -f "name=YT Rank Show $tag" -f "body=$(Get-Content -LiteralPath $notes -Raw)" --silent
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot refresh draft metadata' }
+          } else {
+            $raw = gh api --method POST "repos/$env:GH_REPO/releases" -f "tag_name=$tag" -f "target_commitish=$env:GITHUB_SHA" -f "name=YT Rank Show $tag" -f "body=$(Get-Content -LiteralPath $notes -Raw)" -F draft=true -F prerelease=true -f make_latest=false
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot create draft' }
+            $created = $raw | ConvertFrom-Json
+            if (!$created.draft -or $created.tag_name -ne $tag) { throw 'Expected unpublished draft for requested tag' }
+            $id = $created.id
+          }
+          # Upload binary assets using the draft ID, never the unpublished tag.
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($file in $files) {
+            $name = Split-Path $file -Leaf
+            $raw = gh api "repos/$env:GH_REPO/releases/$id"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot recheck draft before upload' }
+            $draft = $raw | ConvertFrom-Json
+            if (!$draft.draft -or $draft.tag_name -ne $tag) { throw 'Draft changed; stop without replacing assets' }
+            $oldAssets = @($draft.assets | Where-Object name -EQ $name)
+            if ($oldAssets.Count -gt 1) { throw 'Ambiguous draft asset' }
+            $digest = 'sha256:' + (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($oldAssets.Count -eq 1) {
+              if ($oldAssets[0].state -eq 'uploaded' -and $oldAssets[0].digest -eq $digest -and $oldAssets[0].size -eq (Get-Item -LiteralPath $file).Length) { continue }
+              gh api --method DELETE "repos/$env:GH_REPO/releases/assets/$($oldAssets[0].id)" --silent
+              if ($LASTEXITCODE -ne 0) { throw 'Cannot replace unfinished draft asset' }
+            }
+            $upload = "https://uploads.github.com/repos/$env:GH_REPO/releases/$id/assets?name=$([Uri]::EscapeDataString($name))"
+            $uploaded = Invoke-RestMethod -Method Post -Uri $upload -Headers $headers -ContentType 'application/octet-stream' -InFile $file
+            if ($uploaded.name -ne $name -or $uploaded.state -ne 'uploaded' -or $uploaded.digest -ne $digest) { throw 'Uploaded draft asset did not verify' }
+          }
+          $raw = gh api "repos/$env:GH_REPO/releases/$id"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify uploaded release' }
+          $release = $raw | ConvertFrom-Json
+          if (!$release.draft -or !$release.prerelease -or $release.assets.Count -ne $files.Count) { throw 'Unexpected draft or asset count' }
+          foreach ($file in $files) {
+            $name = Split-Path $file -Leaf
+            $asset = @($release.assets | Where-Object name -EQ $name)
+            $digest = 'sha256:' + (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].size -ne (Get-Item -LiteralPath $file).Length -or $asset[0].digest -ne $digest) { throw "Asset verification failed: $name" }
+          }
+          gh api --method PATCH "repos/$env:GH_REPO/releases/$id" -F draft=false -F prerelease=true -f make_latest=false --silent
+          if ($LASTEXITCODE -ne 0) { throw 'Publish failed; draft retained' }
+          "Release: $($release.html_url)" >> $env:GITHUB_STEP_SUMMARY

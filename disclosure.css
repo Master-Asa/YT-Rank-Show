@@ -1,0 +1,19 @@
+/* Native details remain keyboard accessible; the entire summary is clickable. */
+.app-shell details:not(#appearancePanel)>summary:not([hidden]){
+ display:flex;align-items:center;gap:.65em;justify-content:space-between;
+ padding:.7em .85em;margin:.5em 0;border:1px solid #ccc5ec;border-radius:.65em;
+ background:#f4f1ff;color:#423b77;font-size:1em;font-weight:600;line-height:1.5;
+ cursor:pointer;list-style:none;min-height:2.8em;
+}
+.app-shell details>summary::-webkit-details-marker{display:none}
+.app-shell details:not(#appearancePanel)>summary:not([hidden])::after{
+ content:'＋ 展開';flex:none;font-size:.85em;font-weight:500;color:#6753b6;
+}
+.app-shell details[open]:not(#appearancePanel)>summary:not([hidden])::after{content:'− 收合'}
+.app-shell details:not(#appearancePanel)>summary:hover{background:#eae4ff;border-color:#9c8cd8}
+.app-shell details>summary:focus-visible{outline:.18em solid #7255db;outline-offset:.15em}
+.app-shell details[open]:not(#appearancePanel)>summary{margin-bottom:.9em}
+.app-shell .url-detail>summary{max-width:18em}
+#backgroundNotice{padding:.8em 1em;border-radius:.6em;background:#f0edf9;margin-bottom:1em;line-height:1.6}
+#backgroundNotice[data-state='ready']{background:#eaf6ef;color:#235e42}
+#backgroundNotice[data-state='error']{background:#fff0e8;color:#8a3d21}

@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const src=fs.readFileSync(path.join(__dirname,'../admin.js'),'utf8');
+const code=src.slice(src.indexOf("const RESET_KEY="),src.indexOf('function ensureSDK'));
+function setup(search='',saved=null){let value=saved;const c={Date,Number,JSON,Set,URLSearchParams,location:{search},window:{addEventListener(){}},state:{events:[{eventId:'old',timestamp:'2026-01-01T00:00:00Z'}]},localStorage:{getItem(){return value},setItem(k,v){value=v}}};vm.createContext(c);vm.runInContext(code,c);return c}
+test('reset excludes old and replayed IDs while allowing new support; event history retained',()=>{const c=setup();c.saveReset(2000);assert.equal(c.isResetEvent({eventId:'old',timestamp:new Date(3000).toISOString()}),true);assert.equal(c.isResetEvent({eventId:'replay',timestamp:new Date(1000).toISOString()}),true);assert.equal(c.isResetEvent({eventId:'new',timestamp:new Date(3000).toISOString()}),false);assert.equal(c.state.events.length,1)});
+test('OBS reset URL excludes old events in a separate empty browser store',()=>{const c=setup('?reset=2000');assert.equal(c.isResetEvent({eventId:'x',timestamp:new Date(1000).toISOString()}),true);assert.equal(c.isResetEvent({eventId:'y',timestamp:new Date(3000).toISOString()}),false)});
+test('reload preserves exclusion marker and handles invalid timestamps conservatively',()=>{const c=setup('',JSON.stringify({at:2000,ids:['x']}));assert.equal(c.isResetEvent({eventId:'x',timestamp:new Date(5000).toISOString()}),true);assert.equal(c.isResetEvent({eventId:'bad',timestamp:'invalid'}),true)});
+test('failed persistence does not apply a partial reset',()=>{const c=setup();c.localStorage.setItem=()=>{throw Error('quota')};assert.throws(()=>c.saveReset(2000));assert.equal(c.isResetEvent({eventId:'old',timestamp:new Date(1000).toISOString()}),false)});
