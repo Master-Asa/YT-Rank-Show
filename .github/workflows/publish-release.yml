@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version in VERSION, for example 0.8.7 (without v)'
+        description: 'Version in VERSION, for example 0.9.2 (without v)'
         required: true
         type: string
   push:
@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: private-test-release
+  group: formal-release
   cancel-in-progress: false
 jobs:
   publish:
@@ -20,7 +20,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
-       github.event.head_commit.message == 'Publish release v0.8.7')
+       github.event.head_commit.message == 'Publish release v0.9.2')
     runs-on: windows-latest
     timeout-minutes: 20
     permissions:
@@ -42,7 +42,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
-          $requested = if ($env:GITHUB_EVENT_NAME -eq 'push') { '0.8.7' } else { $env:REQUESTED_VERSION }
+          $requested = if ($env:GITHUB_EVENT_NAME -eq 'push') { '0.9.2' } else { $env:REQUESTED_VERSION }
           if ($version -ne $requested) { throw 'Requested version does not match checkout' }
           $tag = 'v' + $version
           $existing = git tag --list $tag
@@ -50,7 +50,7 @@ jobs:
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
       - name: Verify and package (three successful test rounds required)
         run: node scripts/package.js
-      - name: Upload draft, verify assets, then publish pre-release
+      - name: Upload draft, verify assets, then publish formal release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -60,7 +60,7 @@ jobs:
           $version = $env:RELEASE_VERSION
           $tag = 'v' + $version
           $private = gh api "repos/$env:GH_REPO" --jq '.private'
-          if ($LASTEXITCODE -ne 0 -or $private -ne 'true') { throw 'This workflow only publishes in a private repository' }
+          if ($LASTEXITCODE -ne 0 -or $private -ne 'false' -or $env:GH_REPO -ne 'Master-Asa/YT-Rank-Show') { throw 'Expected the public YT-Rank-Show repository' }
           $dirs = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object Name -Like "release-$version-*")
           if ($dirs.Count -ne 1) { throw 'Expected exactly one validated package directory' }
           $folder = $dirs[0].FullName
@@ -121,6 +121,6 @@ jobs:
             $digest = 'sha256:' + (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].size -ne (Get-Item -LiteralPath $file).Length -or $asset[0].digest -ne $digest) { throw "Asset verification failed: $name" }
           }
-          gh api --method PATCH "repos/$env:GH_REPO/releases/$id" -F draft=false -F prerelease=true -f make_latest=false --silent
+          gh api --method PATCH "repos/$env:GH_REPO/releases/$id" -F draft=false -F prerelease=false -f make_latest=true --silent
           if ($LASTEXITCODE -ne 0) { throw 'Publish failed; draft retained' }
           "Release: $($release.html_url)" >> $env:GITHUB_STEP_SUMMARY
