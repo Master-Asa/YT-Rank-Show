@@ -2,6 +2,27 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process');
 const {createUpdater,candidate,allowed,newer}=require('../src/updater');
 const bytes=Buffer.from('isolated update'),sha=crypto.createHash('sha256').update(bytes).digest('hex');
+test('real Windows bootstrap executes independent helper and completes acknowledgement',{skip:process.platform!=='win32'},async t=>{
+ const {launchWindow}=require('../src/update-launcher');const dir=await fs.mkdtemp(path.join(os.tmpdir(),'yt-update-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100}));
+ await fs.writeFile(path.join(dir,'update-install.ps1'),'\ufeff$ErrorActionPreference="Stop";[IO.File]::WriteAllText((Join-Path $PSScriptRoot "result.json"),\'{"state":"waiting"}\');$end=(Get-Date).AddSeconds(15);while(!(Test-Path (Join-Path $PSScriptRoot "launch-confirmed"))){if((Get-Date)-gt $end){exit 2};Start-Sleep -Milliseconds 50};[IO.File]::WriteAllText((Join-Path $PSScriptRoot "probe-complete"),"ok")');
+ await fs.writeFile(path.join(dir,'result.json'),'{"state":"launching"}');await launchWindow(dir,{timeout:20000});
+ for(let i=0;i<100;i++){try{assert.equal(await fs.readFile(path.join(dir,'probe-complete'),'utf8'),'ok');return;}catch{}await new Promise(r=>setTimeout(r,50));}assert.fail('real helper did not acknowledge');
+});
+test('launcher requires visible-window acknowledgement and reports early exit or timeout',async t=>{
+ const {launchWindow}=require('../src/update-launcher'),{EventEmitter}=require('node:events');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'yt-update-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:5}));
+ let killed=false,unref=false;
+ const child=()=>Object.assign(new EventEmitter(),{kill(){killed=true;},unref(){unref=true;}});
+ await fs.writeFile(path.join(dir,'result.json'),JSON.stringify({state:'launching'}));
+ await assert.rejects(launchWindow(dir,{spawn:()=>{const c=child();setTimeout(()=>c.emit('exit',1,null),5);return c;},timeout:500,poll:5}),/程序已結束/);
+ await assert.rejects(launchWindow(dir,{spawn:child,timeout:20,poll:5}),/逾時/);assert.equal(killed,true);
+ await fs.writeFile(path.join(dir,'result.json'),JSON.stringify({state:'waiting'}));await launchWindow(dir,{spawn:child,timeout:500,poll:5});assert.equal(unref,true);
+});
+test('failed launch keeps verified package available for retry',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'yt-update-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:5}));
+ const u=await createUpdater({dir,current:'0.9.0',autoStart:false,get:async url=>url.includes('/releases?')?Buffer.from(JSON.stringify([release()])):bytes,prepare:async()=>{},launch:async()=>{throw Error('launch failed');}});t.after(()=>u.close());
+ await u.check();await u.stage();await assert.rejects(u.install(),/launch failed/);assert.equal(u.status().phase,'ready');assert.equal(u.status().ready,true);assert.equal(u.status().busy,false);
+});
 function release(v='0.9.1'){return {tag_name:'v'+v,body:'test',assets:[{name:'YT-Rank-Show-'+v+'-Windows.zip',state:'uploaded',size:bytes.length,digest:'sha256:'+sha,browser_download_url:'https://github.com/Master-Asa/YT-Rank-Show/releases/download/v'+v+'/YT-Rank-Show-'+v+'-Windows.zip'}]};}
 test('only newer formal releases with exact trusted asset and digest are offered',()=>{assert.equal(newer('0.10.0','0.9.9'),true);assert.equal(candidate([release('0.9.0')],'0.9.0'),null);assert.equal(candidate([{...release(),prerelease:true}],'0.9.0'),null);assert.equal(candidate([{...release(),draft:true}],'0.9.0'),null);const bad=release();bad.assets[0].browser_download_url='https://evil.invalid/file';assert.equal(candidate([bad],'0.9.0'),null);assert.equal(candidate([release('0.9.1'),release('0.10.0')],'0.9.0').version,'0.10.0');for(const u of ['http://github.com/a','https://github.com.evil.invalid/a','https://user@github.com/a','https://127.0.0.1/a'])assert.throws(()=>allowed(u));});
 test('check/download/install state, consent preference persistence, and corruption rejection',async t=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'yt-update-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100}));let calls=0,launches=0,corrupt=false;const make=()=>createUpdater({dir,current:'0.9.0',autoStart:false,get:async url=>{calls++;return url.includes('/releases?')?Buffer.from(JSON.stringify([release()])):corrupt?Buffer.from('bad'):bytes;},prepare:async()=>{},launch:async()=>{launches++;}});const u=await make();t.after(()=>u.close());assert.equal(calls,0);assert.equal(u.status().automatic,false);assert.equal((await u.check()).busy,false);assert.equal(u.status().available.version,'0.9.1');corrupt=true;await assert.rejects(u.stage(),/驗證失敗/);assert.equal(u.status().ready,false);corrupt=false;assert.equal((await u.stage()).busy,false);assert.equal(u.status().ready,true);await u.savePrefs(true);const second=await make();second.close();assert.equal(second.status().automatic,true);await u.install();assert.equal(launches,1);assert.equal(u.status().phase,'waiting');await assert.rejects(u.install(),/進行中/);});

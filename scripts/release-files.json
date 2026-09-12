@@ -1,5 +1,6 @@
 {
   "install": [
+    "src/update-launcher.js",
     "src/updater.js",
     "scripts/update-install.ps1",
     "update-ui.js",
