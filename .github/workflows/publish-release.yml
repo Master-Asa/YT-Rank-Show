@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    # One-time authorized bootstrap; later releases use Run workflow on main.
+    # Authorized v0.9.2 bootstrap; run all Windows test files sequentially before publication.
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||

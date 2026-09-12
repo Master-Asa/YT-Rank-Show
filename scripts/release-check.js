@@ -20,7 +20,8 @@ function run(){
  for(const file of files.filter(x=>x.endsWith('.html'))){const html=fs.readFileSync(path.join(root,file),'utf8');for(const m of html.matchAll(/(?:src|href)="([^"#]+)"/g)){if(/^(?:https?:|data:)/.test(m[1])||!manifest.install.includes(m[1]))throw Error('Unbundled/external entry asset: '+m[1]);}}
  const rounds=Number(process.env.YT_TEST_ROUNDS||3);if(!Number.isInteger(rounds)||rounds<1||rounds>5)throw Error('YT_TEST_ROUNDS must be 1..5');
  const tests=files.filter(x=>/^tests\/.*\.test\.js$/.test(x));
- for(let i=1;i<=rounds;i++){console.log('Release test round '+i+'/'+rounds);cp.execFileSync(process.execPath,['--test',...tests],{cwd:root,stdio:'inherit',windowsHide:true});}
+ // Windows integration tests launch PowerShell; avoid competing compiler/process startup across files.
+ for(let i=1;i<=rounds;i++){console.log('Release test round '+i+'/'+rounds);cp.execFileSync(process.execPath,['--test','--test-concurrency=1',...tests],{cwd:root,stdio:'inherit',windowsHide:true});}
  return {version:fs.readFileSync(path.join(root,'VERSION'),'utf8').trim(),files:files.length,rounds,sourceSha256:digest.digest('hex')};
 }
 if(require.main===module)console.log(JSON.stringify(run()));module.exports={run};
