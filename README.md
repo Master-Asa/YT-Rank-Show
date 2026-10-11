@@ -6,6 +6,10 @@
 
 OneComme 的 YouTube 支持紀錄與 OBS 排行榜插件。支援 SC／Super Sticker、贈送會員與寶石三種獨立榜單、頻道鎖定、逐場確認、月份 CSV、外觀預覽、自訂榜名、字型與背景圖。
 
+## 幣別換算
+
+支援幣別：TWD、USD、JPY、HKD、CNY、EUR、KRW，以及新增的 MYR、SGD、THB、IDR、PHP、AUD、CAD、GBP，共 15 種。SC／貼圖依本機設定匯率換算新台幣，不自動抓即時匯率。詳見[幣別、預設估值與重新計算](docs/CURRENCIES.md)。
+
 ## 適用環境
 
 主要驗證環境：**Windows 11 64 位元（目前為 25H2）＋OneComme 9.1.1**。OBS 需含「瀏覽器」來源。確認小視窗需要系統 Windows PowerShell 5.1 與 Windows Forms；一般安裝不需另裝 Node.js。

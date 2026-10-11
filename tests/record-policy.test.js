@@ -72,7 +72,7 @@ test('Node 正規化不虛構本場、時間或把連線 ID 當事件 ID',()=>{
 function browserContext(){
   const source=fs.readFileSync(require.resolve('../admin.js'),'utf8');
   const storage=new Map();
-  const ctx={RecordPolicy:p,URLSearchParams,location:{search:''},Date,Number,String,JSON,Map,connectionMode:'onesdk',
+  const ctx={RankCurrency:require('../currency'),RecordPolicy:p,URLSearchParams,location:{search:''},Date,Number,String,JSON,Map,connectionMode:'onesdk',
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},
     state:{settings:{...core.DEFAULT_SETTINGS},session:{liveId:'active'},events:[]},
     observeSession:()=>{},render:()=>{},text:()=>{},$:()=>({}),isResetEvent:()=>false};

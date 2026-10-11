@@ -2,14 +2,17 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const Policy=require('../record-policy'),Lock=require('../channel-lock'),Theme=require('../style-theme'),Output=require('../rank-output');
 const {DEFAULT_SETTINGS,normalizeEvent,inPeriod,formatRanking}=require('./core');
+const Currency=require('../currency');
 const clone=value=>JSON.parse(JSON.stringify(value));
 const {createStateStore,atomicWrite}=require('./state-store');
 function cleanSettings(value={},base=DEFAULT_SETTINGS){
  const next={...DEFAULT_SETTINGS,...base,rates:{...DEFAULT_SETTINGS.rates,...base.rates}};
- for(const key of ['dollarCurrency','ratesUpdatedAt','giftUnit','emptyText'])if(typeof value[key]==='string')next[key]=value[key].slice(0,300);
+ for(const key of ['ratesUpdatedAt','giftUnit','emptyText'])if(typeof value[key]==='string')next[key]=value[key].slice(0,300);
+ if(value.dollarCurrency!==undefined){if(!['TWD','USD'].includes(value.dollarCurrency))throw Error('單獨 $ 只可設定為 TWD 或 USD');next.dollarCurrency=value.dollarCurrency;}
  for(const key of ['showTitle','showAmount','showCurrency','showGiftUnit','truncateNames'])if(typeof value[key]==='boolean')next[key]=value[key];
  for(const [key,min,max] of [['rankNameSpaces',0,20],['nameValueSpaces',0,20],['blankLines',0,2],['maxNameLength',1,100]])if(value[key]!==undefined){const n=Number(value[key]);if(!Number.isFinite(n))throw Error('無效設定：'+key);next[key]=Math.max(min,Math.min(max,Math.round(n)));}
- if(value.rates)for(const currency of Object.keys(DEFAULT_SETTINGS.rates)){const n=Number(value.rates[currency]);if(Number.isFinite(n)&&n>0&&n<1000000)next.rates[currency]=n;}
+ if(value.rates)for(const currency of Object.keys(DEFAULT_SETTINGS.rates)){if(!Object.hasOwn(value.rates,currency))continue;const n=Currency.numberValue(value.rates[currency]);if(n===null||n<=0||n>=1000000)throw Error('無效匯率：'+currency);next.rates[currency]=n;}
+ next.rates.TWD=1;
  next.timezone='Asia/Taipei';next.channelLock=Lock.normalize(value.channelLock??base.channelLock);
  next.recordMode=(value.recordMode??base.recordMode)==='test'?'test':'production';return next;
 }
@@ -23,7 +26,7 @@ async function createUnlockedRuntime({dir,store,dataDir:configuredDataDir,releas
  let saved={schemaVersion:3,events:[],settings:cleanSettings(store?.store||{}),reset:cleanReset(),themes:Theme.normalizeMap({}),writeToken:crypto.randomBytes(32).toString('hex'),migrated:false,migrationSource:'',revision:0};
  const storage=createStateStore(dataDir),history=require('./history-import').createHistoryImport({readDatabase:historyReader,now:clock,resolveVideo:historyVideoResolver});
  try{const raw=await storage.load();if(raw){if(raw.schemaVersion!==3||!Array.isArray(raw.events)||!/^[a-f0-9]{64}$/.test(raw.writeToken))throw Error('背景資料格式不正確');const oldImages=Theme.keys.some(key=>[1,2,3].some(i=>raw.themes?.[key]?.icons?.[i]?.image));if(oldImages){await storage.backup(raw);raw.revision++;}saved={...saved,...raw,settings:cleanSettings(raw.settings),reset:cleanReset(raw.reset),themes:Theme.normalizeMap(raw.themes)};}
- else{try{saved.events=(await fs.readFile(path.join(root,'data','events.jsonl'),'utf8')).split(/\r?\n/).filter(Boolean).map(JSON.parse);}catch(e){if(e.code!=='ENOENT')throw e;}}const separated=Theme.individualize(saved.themes);if(JSON.stringify(separated)!==JSON.stringify(saved.themes)){await storage.backup(saved);saved={...saved,themes:separated,revision:saved.revision+1};}await storage.save(saved);}
+ else{try{saved.events=(await fs.readFile(path.join(root,'data','events.jsonl'),'utf8')).split(/\r?\n/).filter(Boolean).map(JSON.parse);}catch(e){if(e.code!=='ENOENT')throw e;}}const separated=Theme.individualize(saved.themes);if(JSON.stringify(separated)!==JSON.stringify(saved.themes)){await storage.backup(saved);saved={...saved,themes:separated,revision:saved.revision+1};}const repaired=Currency.recalculate(saved.events,saved.settings,{newOnly:true});if(repaired.changed){await storage.backup(saved,'repair');saved={...saved,events:repaired.events,revision:saved.revision+1};}await storage.save(saved);}
  catch(e){throw Error('背景資料讀取／轉換失敗，已停止以免覆寫：'+e.message);}
  const outputCache=new Map();
  async function writeOutput(name,text){if(outputCache.get(name)===text)return;await atomicWrite(name,text);outputCache.set(name,text);}
@@ -197,6 +200,8 @@ async function createUnlockedRuntime({dir,store,dataDir:configuredDataDir,releas
    }else if(body.action==='resolveChannel')return {code:410,response:{error:'離線版不會查詢 YouTube，請人工確認頻道與直播。'}};
    else if(body.action&&body.action!=='sync')throw Error('不支援此操作');
   }else return {code:405,response:{error:'Method not allowed'}};
+  const recalculateMoney=(req.method==='PUT'&&body.action!=='exclude'&&(body.rates!==undefined||body.dollarCurrency!==undefined))||(req.method==='POST'&&!body.action);
+  if(recalculateMoney){const recalculated=Currency.recalculate(next.events,next.settings);if(recalculated.changed){await storage.backup(saved,'repair');next.events=recalculated.events;}}
   await commit(next);return {code:200,response:{...view(),styles:clone(saved.themes)}};
  });}catch(e){lastError=e.message;return {code:400,response:{error:e.message}};}}
  function pendingConfirmations(){

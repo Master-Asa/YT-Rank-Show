@@ -2,34 +2,15 @@
 const crypto = require('node:crypto');
 const RecordPolicy = require('../record-policy');
 const ChannelLock = require('../channel-lock');
+const Currency = require('../currency');
 
 const DEFAULT_SETTINGS = Object.freeze({
-  channelLock: ChannelLock.normalize(), timezone: 'Asia/Taipei', dollarCurrency: 'TWD', rates: { TWD: 1, USD: 31.5, JPY: 0.21, HKD: 4.05, CNY: 4.35, EUR: 34.5, KRW: 0.024 },
+  channelLock: ChannelLock.normalize(), timezone: 'Asia/Taipei', dollarCurrency: 'TWD', rates: { ...Currency.defaultRates },
   ratesUpdatedAt: '2026-09-09', showTitle: true, rankNameSpaces: 1, nameValueSpaces: 4, blankLines: 0,
   showAmount: true, showCurrency: true, showGiftUnit: true, giftUnit: '個', maxNameLength: 20, truncateNames: true, emptyText: ''
 });
-const SYMBOLS = { 'NT$':'TWD', 'NT $':'TWD', TWD:'TWD', NTD:'TWD', 'US$':'USD', USD:'USD', '¥':'JPY', '￥':'JPY', JPY:'JPY', HKD:'HKD', 'HK$':'HKD', CNY:'CNY', RMB:'CNY', EUR:'EUR', '€':'EUR', KRW:'KRW', '₩':'KRW' };
-function numberValue(value) { if (value === null || value === undefined || String(value).trim() === '') return null; const n = Number(String(value).replace(/,/g, '').trim()); return Number.isFinite(n) ? n : null; }
-function normalizeUnit(unit, dollarCurrency='TWD') {
-  const raw = String(unit || '').trim().toUpperCase();
-  if (raw === '$') return { currency: dollarCurrency, source: 'single-dollar-setting' };
-  const currency = SYMBOLS[raw]; return { currency: currency || null, source: currency ? 'structured-unit' : 'unknown-unit' };
-}
-function parsePaidText(text, dollarCurrency='TWD') {
-  const raw = String(text || '').trim();
-  const m = raw.match(/^\s*(NT\s*\$|NTD|TWD|US\$|USD|HK\$|HKD|CNY|RMB|EUR|€|JPY|¥|￥|KRW|₩|\$)\s*([0-9][0-9,]*(?:\.[0-9]+)?)/i);
-  if (!m) return { amount: null, currency: null, source: 'unparsed-paid-text' };
-  const token = m[1].replace(/\s+/g, '').toUpperCase();
-  const result = normalizeUnit(token === 'NT$' ? 'NT$' : token, dollarCurrency);
-  return { amount: numberValue(m[2]), currency: result.currency, source: result.currency ? 'paid-text' + (token === '$' ? '-single-dollar-setting' : '') : 'unknown-paid-text' };
-}
-function currencyDetails(data={}, settings=DEFAULT_SETTINGS) {
-  const paidText = data.paidText ?? data.priceText ?? data.amountText ?? '';
-  let amount = numberValue(data.price ?? data.amount); let decision = normalizeUnit(data.unit ?? data.currency, settings.dollarCurrency);
-  if (amount === null || !decision.currency) { const parsed = parsePaidText(paidText, settings.dollarCurrency); if (amount === null) amount = parsed.amount; if (!decision.currency) decision = { currency: parsed.currency, source: parsed.source }; }
-  const rate = decision.currency ? numberValue(settings.rates?.[decision.currency]) : null;
-  return { originalPaidText: String(paidText || ''), originalAmount: amount, originalCurrency: String(data.unit ?? data.currency ?? ''), normalizedCurrency: decision.currency, amountTwd: amount !== null && rate !== null ? Math.round(amount * rate * 100) / 100 : null, exchangeRate: rate, currencyDecisionSource: decision.source };
-}
+const {normalizeUnit,parsePaidText}=Currency;
+function currencyDetails(data={},settings=DEFAULT_SETTINGS){return Currency.details(data,settings);}
 function eventTypeOf(item) { const d=item?.data||{}; return String(d.giftType ?? d.type ?? item?.type ?? d.eventType ?? '').toLowerCase().replace(/[_-]/g,''); }
 function fallbackUserKey(service, displayName, profileImage) { return 'fallback:' + crypto.createHash('sha256').update([service,displayName,profileImage].join('|')).digest('hex').slice(0,24); }
 function normalizeEvent(item, session={}, settings=DEFAULT_SETTINGS, now=new Date()) {

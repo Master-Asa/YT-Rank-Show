@@ -17,7 +17,7 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">▂▅▇</span><div><h1>YT <strong>Rank</strong> Show</h1><div class="brand-meta">ONECOMME SUPPORT TRACKER <span class="brand-version">v0.9.3</span></div></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">▂▅▇</span><div><h1>YT <strong>Rank</strong> Show</h1><div class="brand-meta">ONECOMME SUPPORT TRACKER <span class="brand-version">v0.9.4</span></div></div></div>
       <div id="status" class="connection-pill"><i></i><span>正在連接わんコメ…</span></div>
     </header>
     <nav class="nav nav-pills app-nav" aria-label="主要功能">
@@ -115,7 +115,7 @@
               <label class="field"><span>名稱最大長度</span><input type="number" class="form-control" name="maxNameLength" min="1" max="100"></label>
             </div>
             <label class="form-check setting-switch"><input class="form-check-input" type="checkbox" name="showTitle"><span class="form-check-label">顯示排行榜標題</span></label>
-            </details><details class="advanced-block"><summary>手動匯率（只影響 SC 換算）</summary><fieldset class="rates-card"><legend>人工匯率 <span>兌 TWD</span></legend><div id="rates" class="rate-grid"></div></fieldset></details>
+            </details><details class="advanced-block"><summary>換算匯率（SC／貼圖）</summary><fieldset class="rates-card"><legend>1 單位外幣 <span>兌新台幣</span></legend><p class="small text-secondary">使用設定匯率自動換算，不連網抓匯率。儲存後會重新換算已保存的紀錄；預設值僅供估算。</p><div id="rates" class="rate-grid"></div></fieldset></details>
             <details id="privacyInfo" class="advanced-block"><summary>隱私與背景收錄說明</summary><p>插件不含遙測、雲端備份或線上 YouTube 解析。紀錄、背景圖與字型只保存在本機；OBS 從本機讀取。OneComme 本身仍會連線直播平台。</p><p>背景資料位於 Windows 的 %APPDATA%\YT-Rank-Show\data，與更新的程式檔分開。JSON 備份含全部原始紀錄，請勿隨意分享。OBS 網址也請保密。</p><p>背景啟用後可關閉管理頁；關閉 OneComme 或停用插件就停止收錄。未啟用背景的過渡模板模式仍需管理頁保持開啟。沒有任何軟體能保證已受感染的電腦或其他插件不會讀取本機資料。</p></details>
             <p id="outputPath" class="path-note"></p>
             <div class="action-row"><button class="btn btn-primary" type="submit">儲存設定</button><button class="btn btn-outline-secondary" type="button" id="rebuild">重新計算排行</button></div>
@@ -141,6 +141,7 @@
   <script src="public-resolver.js"></script>
   <script src="record-policy.js"></script>
   <script src="rank-output.js"></script>
+  <script src="currency.js"></script>
   <script src="admin.js"></script>
   <script src="record-export.js"></script>
   <script src="channel-admin.js"></script>

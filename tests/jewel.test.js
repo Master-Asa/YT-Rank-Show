@@ -17,7 +17,7 @@ test('OBS 寶石來源只顯示獨立數字，無本場時空白、月份依台�
  currentChannelLock:()=>config,isResetEvent:()=>false,MutationObserver:class{constructor(cb){callback=cb}observe(){}}};
  vm.createContext(ctx);vm.runInContext(s.slice(s.indexOf('const OBS_MODE='),s.indexOf('function preview()')),ctx);
  assert.equal(el('direct').textContent,'300');assert.equal(el('kind').value,'sc');
- ctx.state.events=[norm(item(5))];callback();assert.equal(el('direct').textContent,'500');
+ const later=norm(item(5,100,{timestamp:now.toISOString()}));later.createdAt=later.timestamp;ctx.state.events=[later];callback();assert.equal(el('direct').textContent,'500');
  ctx.state.session={};callback();assert.equal(el('direct').textContent,'');
  assert.equal(p.jewelTotal(ctx.eventsFor('monthly')),500);
  ctx.state.events[0].timestamp='2020-01-01T00:00:00Z';assert.equal(p.jewelTotal(ctx.eventsFor('monthly')),0);
@@ -53,7 +53,7 @@ test('寶石沿用頻道鎖、場次、月份、測試與清空排除；CSV 保�
 });
 test('瀏覽器接收、連送更新及保存使用相同寶石規則',()=>{
  const s=fs.readFileSync(require.resolve('../admin.js'),'utf8'),storage=new Map();
- const ctx={RecordPolicy:p,URLSearchParams,location:{search:''},Date,Number,String,JSON,Map,connectionMode:'onesdk',
+ const ctx={RankCurrency:require('../currency'),RecordPolicy:p,URLSearchParams,location:{search:''},Date,Number,String,JSON,Map,connectionMode:'onesdk',
  localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},state:{settings:{...core.DEFAULT_SETTINGS},session:{},events:[]},
  observeSession(){},render(){},text(){},$(){return {}},isResetEvent:()=>false};
  vm.createContext(ctx);vm.runInContext(s.slice(s.indexOf('function sdkMoney('),s.indexOf('// Session selection')),ctx);
